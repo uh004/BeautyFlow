@@ -1,0 +1,84 @@
+# ==========================================
+# Data & Large Files (데이터 및 대용량/문서 파일)
+# ==========================================
+data/
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.pptx
+*.pdf
+*.parquet
+*.feather
+*.h5
+*.pkl
+*.pickle
+*.sqlite
+*.sqlite3
+*.db
+
+# ==========================================
+# Environment Variables & Secrets (환경변수 및 보안 키)
+# ==========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+credentials.json
+client_secret*.json
+service_account*.json
+
+# ==========================================
+# Operating System (OS 생성 파일)
+# ==========================================
+.DS_Store
+Thumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ==========================================
+# IDEs & Editors (에디터 설정 파일)
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ==========================================
+# Python (파이썬 가상환경 및 캐시)
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ==========================================
+# Node.js / Frontend (웹 및 노드 모듈)
+# ==========================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next/
+.nuxt/
+out/
+
+# ==========================================
+# Logs & Temporary Files (로그 및 임시 파일)
+# ==========================================
+logs/
+*.log
+tmp/
+temp/
