@@ -2,6 +2,7 @@
 # Data & Large Files (데이터 및 대용량/문서 파일)
 # ==========================================
 data/
+output/
 *.csv
 *.tsv
 *.xlsx
@@ -63,6 +64,7 @@ dist/
 *.egg-info/
 .pytest_cache/
 .ipynb_checkpoints/
+test-results/
 
 # ==========================================
 # Node.js / Frontend (웹 및 노드 모듈)
@@ -82,3 +84,4 @@ logs/
 *.log
 tmp/
 temp/
+/.tmp_*

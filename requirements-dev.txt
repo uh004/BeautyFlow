@@ -1,0 +1,11 @@
+# Dependencies for the existing offline notebook tests (Python 3.11).
+pytest==9.0.2
+openai==2.26.0
+langchain-core==1.2.17
+langchain-openai==1.1.10
+langgraph==1.0.10
+pydantic==2.12.5
+Pillow==13.0.0
+numpy==2.4.2
+imageio-ffmpeg==0.8.1
+websockets==16.0
