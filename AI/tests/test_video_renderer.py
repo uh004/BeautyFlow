@@ -44,8 +44,9 @@ class VideoRendererTests(unittest.TestCase):
         self.assertEqual(report['resolution'], '1080x1920')
         self.assertTrue(report['requires_video_qa'])
         self.assertEqual(len(self.commands), 5)
-        self.assertIn('ass=subtitles.ass', self.commands[-1])
-        self.assertIn('1:a:0', self.commands[-1])
+        joined_cmd = ' '.join(self.commands[-1])
+        self.assertIn('ass=subtitles.ass', joined_cmd)
+        self.assertTrue('1:a:0' in self.commands[-1] or f'{len(self.state["scenes"])}:a:0' in self.commands[-1])
 
     def test_cumulative_frames_do_not_accumulate_rounding(self):
         timeline, _, total = self.ns['prepare_video_timeline'](self.state)

@@ -3,6 +3,7 @@
 # ==========================================
 data/
 output/
+output2/
 *.csv
 *.tsv
 *.xlsx
@@ -85,3 +86,17 @@ logs/
 tmp/
 temp/
 /.tmp_*
+*.tmp
+*.bak
+
+# ==========================================
+# Generated Media & Test/Lint Caches (생성 미디어 및 분석 캐시)
+# ==========================================
+*.mp4
+*.wav
+*.mp3
+*.ass
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/

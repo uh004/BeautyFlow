@@ -1,6 +1,7 @@
 """기존 LUMIA 결과로 실제 FFmpeg QA를 검사한다. 결과 파일이 없으면 명시적으로 건너뛴다."""
 import copy
 import json
+import os
 import shutil
 import subprocess
 import unittest
@@ -12,22 +13,42 @@ import test_script_generator as script_tests
 import test_video_qa as qa_tests
 
 ROOT = script_tests.ROOT
-RENDER = ROOT / 'output/render_checks/video/LUMIA/55fbdf27410f/render.json'
-TTS = ROOT / 'output/tts_checks/audio/LUMIA/695eca22996d/tts.json'
-VALIDATION = ROOT / 'output/revision_checks/LUMIA_validation.json'
+ARCHIVE = ROOT / ('output2' if (ROOT / 'output2').is_dir() else 'output')
+RENDER = ARCHIVE / 'render_checks/video/LUMIA/55fbdf27410f/render.json'
+TTS = ARCHIVE / 'tts_checks/audio/LUMIA/695eca22996d/tts.json'
+VALIDATION = ARCHIVE / 'revision_checks/LUMIA_validation.json'
+STATE = Path(os.environ['BEAUTYFLOW_RENDER_STATE']) if os.environ.get('BEAUTYFLOW_RENDER_STATE') else None
+
+
+def relocated(value):
+    if isinstance(value, dict): return {k: relocated(v) for k, v in value.items()}
+    if isinstance(value, list): return [relocated(v) for v in value]
+    if isinstance(value, str) and ('\\output\\' in value or '/output/' in value):
+        if not Path(value).exists():
+            candidate = value.replace('\\output\\', '\\output2\\').replace('/output/', '/output2/')
+            if Path(candidate).exists(): return candidate
+    return value
 
 
 @pytest.mark.integration
-@unittest.skipUnless(RENDER.is_file() and TTS.is_file() and VALIDATION.is_file(), 'LUMIA 실측 결과가 없어 실제 영상 QA 검사를 건너뜁니다.')
+@unittest.skipUnless((STATE and STATE.is_file()) or (RENDER.is_file() and TTS.is_file() and VALIDATION.is_file()), 'LUMIA 실측 결과가 없어 실제 영상 QA 검사를 건너뜁니다.')
 class VideoQAIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         qa_tests.VideoQATests.setUpClass()
         cls.ns = qa_tests.VideoQATests.ns
         cls.ns['subprocess'] = subprocess
-        cls.render = json.loads(RENDER.read_text(encoding='utf-8'))
-        cls.tts = json.loads(TTS.read_text(encoding='utf-8'))
-        cls.validation = json.loads(VALIDATION.read_text(encoding='utf-8'))
+        if STATE:
+            cls.tts = json.loads(STATE.read_text(encoding='utf-8'))
+            cls.render = json.loads(Path(cls.tts['render_json_path']).read_text(encoding='utf-8'))
+            cls.validation = {'validation_result': cls.tts['validation_result']}
+        else:
+            cls.render = relocated(json.loads(RENDER.read_text(encoding='utf-8')))
+            cls.tts = relocated(json.loads(TTS.read_text(encoding='utf-8')))
+            cls.validation = json.loads(VALIDATION.read_text(encoding='utf-8'))
+        version = cls.ns.get('LAYOUT_VERSION')
+        if version and cls.render.get('layout_version') != version:
+            raise unittest.SkipTest(f'현재 {version} 레이아웃으로 생성한 영상이 필요합니다. BEAUTYFLOW_RENDER_STATE에 새 결과 State를 지정하세요.')
         cls.original = Path(cls.render['video_path'])
 
     def setUp(self):
@@ -81,13 +102,28 @@ class VideoQAIntegrationTests(unittest.TestCase):
         self.assert_rejected(self.evaluate(), 'audio_similarity')
 
     def test_shifted_audio_is_rejected(self):
-        self.transcode(['-c:v', 'copy', '-af', 'adelay=500:all=1', '-c:a', 'aac', '-t', '26.55'])
+        self.transcode(['-c:v', 'copy', '-af', 'adelay=500:all=1', '-c:a', 'aac', '-t', str(self.tts['tts_duration_sec'])])
         self.assert_rejected(self.evaluate(), 'audio_similarity')
 
     def test_absent_burned_captions_are_rejected(self):
-        clips = self.original.parent / 'clips.txt'
-        self.ns['qa_ffmpeg'](['-y', '-f', 'concat', '-safe', '1', '-i', str(clips), '-i', self.tts['audio_path'],
-                             '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-t', '26.55', str(self.video)])
+        duration = str(self.tts['tts_duration_sec'])
+        if str(self.ns.get('LAYOUT_VERSION', '')).startswith('v2_'):
+            timeline = self.render['timeline']
+            inputs = []
+            for item in timeline:
+                inputs.extend(['-i', str(self.original.parent / f"scene_{item['scene_no']}.mp4")])
+            inputs.extend(['-i', self.tts['audio_path']])
+            fc = self.ns['build_xfade_filter_complex'](timeline, bgm_enabled=False, total_sec=self.tts['tts_duration_sec'])
+            fc = fc.replace('ass=subtitles.ass,', '')
+            self.ns['qa_ffmpeg']([
+                '-y', *inputs, '-filter_complex', fc, '-map', '[vfinal]', '-map', f'{len(timeline)}:a:0',
+                '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-r', '30',
+                '-c:a', 'aac', '-t', duration, str(self.video),
+            ])
+        else:
+            clips = self.original.parent / 'clips.txt'
+            self.ns['qa_ffmpeg'](['-y', '-f', 'concat', '-safe', '1', '-i', str(clips), '-i', self.tts['audio_path'],
+                                 '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy', '-c:a', 'aac', '-t', duration, str(self.video)])
         self.assert_rejected(self.evaluate(), 'scene_1_caption')
 
     def test_missing_product_region_is_rejected(self):

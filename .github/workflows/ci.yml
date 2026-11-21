@@ -20,6 +20,8 @@ jobs:
       PYTHONUTF8: "1"
       OPENAI_API_KEY: ""
       OPEN_API_KEY: ""
+      LANGSMITH_API_KEY: ""
+      LANGSMITH_TRACING: "false"
     defaults:
       run:
         shell: pwsh
@@ -34,13 +36,21 @@ jobs:
         run: python -m venv .venv
       - name: Install test dependencies
         run: .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-      - name: Run offline tests
+      - name: Run offline tests (AI/beautyflow module + AI/evals)
+        env:
+          BEAUTYFLOW_USE_MODULE: "1"
+        run: .\.venv\Scripts\python.exe -m pytest -m "not integration" --junitxml=test-results/pytest-module.xml
+      - name: Run offline tests (MVP_v2.ipynb)
+        env:
+          BEAUTYFLOW_NOTEBOOK: "AI/notebooks/MVP_v2.ipynb"
+        run: .\.venv\Scripts\python.exe -m pytest -m "not integration" --junitxml=test-results/pytest-v2.xml
+      - name: Run offline tests (MVP.ipynb v1 regression)
         run: .\.venv\Scripts\python.exe -m pytest -m "not integration" --junitxml=test-results/pytest.xml
       - name: Upload test results
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
           name: pytest-results
-          path: test-results/pytest.xml
+          path: test-results/*.xml
           if-no-files-found: warn
           retention-days: 7
