@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from uuid import uuid4
 
 from langgraph.errors import GraphRecursionError
@@ -49,11 +49,25 @@ API_NODES: frozenset[str] = frozenset({
 })
 
 
-def build_video_graph(node_overrides: dict[str, Any] | None = None):
+def _emit_safe(on_event: Callable[[dict[str, Any]], None] | None, payload: dict[str, Any]) -> None:
+    """외부 이벤트 콜백(Backend DB 기록 등)이 파이프라인을 중단시키지 않도록 안전 호출한다."""
+    if on_event is None:
+        return
+    try:
+        on_event(payload)
+    except Exception:
+        pass
+
+
+def build_video_graph(
+    node_overrides: dict[str, Any] | None = None,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
+):
     """8개 노드와 조건부 라우팅 엣지를 연결한 LangGraph를 컴파일한다.
 
     Args:
         node_overrides: 테스트·오류 주입 평가용 노드 함수 치환 맵(선택).
+        on_event: 노드 시작·완료·재시도 이벤트를 수신하는 콜백(Backend 연동용, 선택).
     """
     nodes = {
         "DocumentParser": document_parser,
@@ -68,9 +82,69 @@ def build_video_graph(node_overrides: dict[str, Any] | None = None):
     if node_overrides:
         nodes.update(node_overrides)
 
+    def _wrap_node(node_name: str, fn: Callable[[VideoAgentState], dict]):
+        if on_event is None:
+            return fn
+
+        def wrapped(state: VideoAgentState) -> dict:
+            node_run_id = uuid4().hex[:12]
+            started_at = time.perf_counter()
+            retry_before = int(state.get("retry_count", 0) or 0)
+            _emit_safe(on_event, {
+                "event_type": "node_started",
+                "node_name": node_name,
+                "node_run_id": node_run_id,
+                "retry_count": retry_before,
+                "duration_sec": None,
+                "message": f"{node_name} 실행 시작",
+            })
+            update = fn(state)
+            elapsed = round(time.perf_counter() - started_at, 3)
+            if isinstance(update, dict):
+                status = update.get("status")
+                retry_after = int(update.get("retry_count", retry_before) or 0)
+                is_err = status in {"failed", "fallback_review_required"}
+                product_info = update.get("product_info") if isinstance(update.get("product_info"), dict) else None
+                _emit_safe(on_event, {
+                    "event_type": "node_failed" if is_err else "node_completed",
+                    "node_name": node_name,
+                    "node_run_id": node_run_id,
+                    "retry_count": retry_after,
+                    "duration_sec": elapsed,
+                    "message": update.get("error_message") if is_err else f"{node_name} 완료",
+                    "product_info": product_info,
+                    "update": update,
+                })
+                # 조건부 재시도 분기가 예정된 경우 retry_scheduled 이벤트 추가 기록
+                merged = {**state, **update}
+                retry_reason = None
+                if not is_err and node_name == "ClaimValidator" and not (update.get("validation_result") or {}).get("is_valid"):
+                    target = route_after_claim_validation(merged)
+                    if target in {"ScriptReviser", "ProductAnalyzer"}:
+                        retry_reason = f"정보 검증 미통과 → {target} 자동 수정 예정"
+                elif not is_err and node_name == "TTSGenerator":
+                    if route_after_tts(merged) == "ScriptReviser":
+                        retry_reason = f"음성 길이({update.get('tts_duration_sec', 0):.1f}s) 기준 외 → ScriptReviser 자동 조정 예정"
+                elif not is_err and node_name == "VideoQA" and not (update.get("qa_result") or {}).get("is_passed"):
+                    target = route_after_video_qa(merged)
+                    if target in {"VideoRenderer", "ScriptReviser"}:
+                        retry_reason = f"영상 QA 미통과 → {target} 자동 재실행 예정"
+                if retry_reason:
+                    _emit_safe(on_event, {
+                        "event_type": "retry_scheduled",
+                        "node_name": node_name,
+                        "node_run_id": node_run_id,
+                        "retry_count": retry_after,
+                        "duration_sec": None,
+                        "message": retry_reason,
+                    })
+            return update
+
+        return wrapped
+
     graph = StateGraph(VideoAgentState)
     for name, fn in nodes.items():
-        graph.add_node(name, fn)
+        graph.add_node(name, _wrap_node(name, fn))
 
     graph.add_edge(START, "DocumentParser")
 
@@ -112,6 +186,7 @@ def run_video_pipeline(
     brand_guide: dict[str, Any] | None = None,
     bgm_path: str | Path | None = None,
     graph=None,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
     run_name: str | None = None,
     tags: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
@@ -160,7 +235,7 @@ def run_video_pipeline(
         tmp.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         tmp.replace(manifest)
 
-    compiled = graph or beautyflow_graph
+    compiled = graph or (build_video_graph(on_event=on_event) if on_event is not None else beautyflow_graph)
     run_config: dict[str, Any] = {
         "recursion_limit": 16 + 6 * max_retries,
         "run_name": run_name or f"BeautyFlow:{stem}",

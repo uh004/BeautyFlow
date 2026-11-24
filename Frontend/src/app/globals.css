@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --bg-canvas: #f6f5fc;
+  --surface-card: #ffffff;
+  --brand-primary: #5b4ef5;
+  --brand-secondary: #7c5cfc;
+  --text-main: #1f1b3a;
+  --text-muted: #6b6884;
+  --border-soft: #e9e6f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-canvas);
+  color: var(--text-main);
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.bf-sidebar-bg {
+  background: linear-gradient(180deg, #ffffff 0%, #faf8ff 65%, #efeaff 100%);
+}
+
+.bf-hero-banner {
+  background: linear-gradient(125deg, #e7e4ff 0%, #ebe3ff 52%, #ddd2ff 100%);
+}
+
+.bf-primary-btn {
+  background: linear-gradient(135deg, #5b4ef5 0%, #7c5cfc 100%);
+  box-shadow: 0 6px 18px rgba(91, 78, 245, 0.25);
+}
+
+.bf-primary-btn:hover {
+  background: linear-gradient(135deg, #4e41e8 0%, #6d4cf5 100%);
+}
+
+.bf-cta-gradient {
+  background: linear-gradient(90deg, #4a90ff 0%, #6858f8 50%, #8b5cf6 100%);
+  box-shadow: 0 8px 20px rgba(98, 90, 246, 0.28);
+}
+
+.bf-cta-gradient:hover {
+  filter: brightness(0.97);
+}

@@ -4,6 +4,7 @@
 data/
 output/
 output2/
+storage/
 *.csv
 *.tsv
 *.xlsx
@@ -18,6 +19,9 @@ output2/
 *.sqlite
 *.sqlite3
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
 
 # ==========================================
 # Environment Variables & Secrets (환경변수 및 보안 키)
@@ -77,6 +81,8 @@ yarn-error.log*
 .next/
 .nuxt/
 out/
+next-env.d.ts
+*.tsbuildinfo
 
 # ==========================================
 # Logs & Temporary Files (로그 및 임시 파일)

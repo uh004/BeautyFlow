@@ -1,4 +1,4 @@
-# Dependencies for offline notebook, AI/beautyflow module, and AI/evals tests (Python 3.11).
+# Dependencies for offline notebook, AI/beautyflow, AI/evals, and Backend API tests (Python 3.11).
 pytest==9.0.2
 openai==2.26.0
 langchain-core==1.8.4
@@ -15,3 +15,8 @@ pandas==3.0.1
 unstructured==0.27.37
 agentevals==0.0.9
 langsmith==0.15.1
+fastapi==0.135.1
+uvicorn==0.41.0
+SQLAlchemy==2.0.48
+httpx==0.28.1
+python-multipart==0.0.22
